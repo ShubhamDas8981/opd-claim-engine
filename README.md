@@ -1,6 +1,6 @@
 # OPD Claim Engine: AI Claims Assistant
 
-![tests](https://github.com/YOUR_USERNAME/claim-ops/actions/workflows/tests.yml/badge.svg)
+![tests](pipeline.svg)
 
 A chat assistant for employee **OPD (outpatient) benefits**. Employees check their balance, upload a medical bill,
 confirm what the AI read, and submit the claim. Small, clean bills are approved instantly. Anything doubtful goes
