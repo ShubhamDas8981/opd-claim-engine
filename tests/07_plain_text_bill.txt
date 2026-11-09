@@ -1,0 +1,8 @@
+Green Pharmacy
+ph: +91 8981964505
+Address: Sudheer Nagar New Delhi
+Bill No 3310
+Date 06/11/2026
+Patient: Karan Das
+Medicines Rs 480
+Total Rs 480
