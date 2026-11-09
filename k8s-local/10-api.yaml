@@ -1,0 +1,61 @@
+# The API. 2 copies would work too; start with 1 and let the autoscaler add more.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opd-api
+  namespace: opd
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: opd-api}
+  template:
+    metadata:
+      labels: {app: opd-api}
+    spec:
+      containers:
+        - name: api
+          image: opd-backend:1.0.0
+          imagePullPolicy: IfNotPresent          # use the image you built on your computer, do not download
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef: {name: opd-env}          # everything from your .env (keys etc.)
+          env:                                    # these win over .env: MySQL/Kafka/Redis still run in docker compose on your PC
+            - {name: MYSQL_URL, value: "mysql+pymysql://root:root_password@host.docker.internal:3306/opd_wallet"}
+            - {name: KAFKA_BOOTSTRAP_SERVERS, value: "host.docker.internal:9094"}
+            - {name: REDIS_URL, value: "redis://host.docker.internal:6379/0"}
+            - {name: REDIS_HOST, value: "host.docker.internal"}
+            - {name: REDIS_PORT, value: "6379"}
+            - {name: CELERY_BROKER_URL, value: "redis://host.docker.internal:6379/1"}
+          volumeMounts:
+            - {name: uploads, mountPath: /srv/uploads}
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}  # the autoscaler measures CPU against this number
+            limits: {memory: 2Gi}
+          startupProbe:                           # the app needs a while to start (it downloads NLTK data)
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 5
+            failureThreshold: 36                  # up to 3 minutes
+          readinessProbe:                         # receives traffic only when this passes
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 10
+          livenessProbe:                          # restarted if this keeps failing
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 20
+            failureThreshold: 3
+      volumes:
+        - name: uploads
+          persistentVolumeClaim: {claimName: opd-uploads}
+---
+# On Docker Desktop a LoadBalancer Service shows up on http://localhost:8000, and spreads requests over all API copies.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opd-api
+  namespace: opd
+spec:
+  type: LoadBalancer
+  selector: {app: opd-api}
+  ports:
+    - port: 8000
+      targetPort: 8000

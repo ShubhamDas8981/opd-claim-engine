@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets and local config (NEVER commit these)
+.env
+.env.*
+!.env.example
+.guardrailsrc
+
+# Runtime data: customer bills, logs, database dumps
+uploads/
+logs/
+*.sql
+!scripts/*.sql
+*.log
+
+# Frontend
+node_modules/
+dist/
+build/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

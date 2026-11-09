@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opd-worker
+  namespace: opd
+spec:
+  replicas: 1                # keep 1: the Kafka topic has 1 partition, so a second worker would just wait
+  selector:
+    matchLabels: {app: opd-worker}
+  template:
+    metadata:
+      labels: {app: opd-worker}
+    spec:
+      containers:
+        - name: worker
+          image: opd-backend:1.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.worker.claims_worker"]
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef: {name: opd-env}
+          env:
+            - {name: MYSQL_URL, value: "mysql+pymysql://root:root_password@host.docker.internal:3306/opd_wallet"}
+            - {name: KAFKA_BOOTSTRAP_SERVERS, value: "host.docker.internal:9094"}
+            - {name: REDIS_URL, value: "redis://host.docker.internal:6379/0"}
+            - {name: REDIS_HOST, value: "host.docker.internal"}
+            - {name: REDIS_PORT, value: "6379"}
+            - {name: CELERY_BROKER_URL, value: "redis://host.docker.internal:6379/1"}
+          volumeMounts:
+            - {name: uploads, mountPath: /srv/uploads}
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {memory: 2Gi}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim: {claimName: opd-uploads}

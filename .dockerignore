@@ -1,0 +1,13 @@
+.venv
+.git
+.vscode
+node_modules
+my-opd-ui
+uploads
+logs
+tests
+monitoring
+deploy
+**/__pycache__
+.env
+*.zip

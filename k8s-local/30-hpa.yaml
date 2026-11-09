@@ -1,0 +1,26 @@
+# The autoscaler: more API copies when average CPU is above 50% of the request (200m), up to 4, fewer again when quiet.
+# Needs metrics-server (see the guide, step 7).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opd-api
+  namespace: opd
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opd-api
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 50}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies: [{type: Pods, value: 2, periodSeconds: 30}]
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies: [{type: Pods, value: 1, periodSeconds: 60}]

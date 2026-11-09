@@ -1,0 +1,161 @@
+# Alert rules. They show up in Prometheus -> Alerts and in Grafana (Alerting -> Alert rules -> Prometheus).
+# To get notified (email / Slack) add an Alertmanager and point Prometheus at it.
+groups:
+  - name: opd-availability
+    rules:
+      - alert: OpdApiDown
+        expr: up{job="opd-api"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "OPD API is down"
+          description: "Prometheus cannot read /metrics from the API for 1 minute."
+
+      - alert: OpdWorkerDown
+        expr: up{job="opd-worker"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Claims worker is down"
+          description: "Bills are not being read. Claims stay in the queue until the worker is back."
+
+      - alert: OpdDatabaseUnreachable
+        expr: opd_db_up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "MySQL cannot be read by the API"
+
+  - name: opd-api
+    rules:
+      - alert: OpdHigh5xxRate
+        expr: |
+          sum(rate(opd_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(opd_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "More than 5% of API requests fail"
+
+      - alert: OpdSlowApi
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(opd_http_request_duration_seconds_bucket{route!="/chat"}[5m]))) > 2
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "API p95 latency is above 2 s (excluding /chat)"
+
+      - alert: OpdSlowChat
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(opd_http_request_duration_seconds_bucket{route="/chat"}[5m]))) > 8
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Chat p95 latency is above 8 s"
+
+  - name: opd-llm
+    rules:
+      - alert: OpdLlmErrors
+        expr: |
+          sum(rate(opd_llm_requests_total{outcome!="ok"}[10m]))
+            / clamp_min(sum(rate(opd_llm_requests_total[10m])), 0.001) > 0.2
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 20% of LLM calls fail"
+          description: "Check the outcome label: rate_limited (Groq quota), bad_json (max tokens), timeout, error."
+
+      - alert: OpdLlmRateLimited
+        expr: sum(increase(opd_llm_requests_total{outcome="rate_limited"}[10m])) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: "Groq is rate limiting us"
+
+      - alert: OpdLlmSlow
+        expr: histogram_quantile(0.95, sum by (le, purpose) (rate(opd_llm_request_duration_seconds_bucket[10m]))) > 15
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "LLM p95 latency above 15 s for {{ $labels.purpose }}"
+
+  - name: opd-guardrails
+    rules:
+      - alert: OpdPromptInjectionSpike
+        expr: sum(increase(opd_guard_events_total{kind="chat-blocked"}[10m])) > 15
+        labels: {severity: warning}
+        annotations:
+          summary: "Many blocked chat messages (possible prompt injection attack)"
+
+      - alert: OpdBillInjectionDetected
+        expr: sum(increase(opd_guard_events_total{kind="bill-injection"}[1h])) > 0
+        labels: {severity: info}
+        annotations:
+          summary: "A bill contained instructions aimed at the AI. It was flagged for human review."
+
+      - alert: OpdUploadAbuse
+        expr: sum(increase(opd_uploads_total{result="refused"}[10m])) > 10
+        labels: {severity: warning}
+        annotations:
+          summary: "Many refused uploads in 10 minutes"
+
+      - alert: OpdRateLimitHits
+        expr: sum(increase(opd_rate_limited_total[10m])) > 20
+        labels: {severity: warning}
+        annotations:
+          summary: "Users are hitting the 20 messages/minute limit"
+
+      - alert: OpdLlmOutputRejected
+        expr: sum(increase(opd_llm_output_rejected_total[15m])) > 10
+        labels: {severity: warning}
+        annotations:
+          summary: "The output guards keep rejecting LLM answers (prompt or model problem?)"
+
+      - alert: OpdGuardrailsAiOff
+        expr: opd_guardrails_ai_enabled == 0
+        for: 5m
+        labels: {severity: info}
+        annotations:
+          summary: "guardrails-ai is not loaded, only the built-in rules are running"
+
+  - name: opd-claims
+    rules:
+      - alert: OpdExtractionFailures
+        expr: |
+          sum(rate(opd_extractions_total{outcome="failed"}[15m]))
+            / clamp_min(sum(rate(opd_extractions_total[15m])), 0.001) > 0.25
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 25% of bills fail extraction"
+
+      - alert: OpdHumanReviewBacklog
+        expr: opd_oldest_pending_claim_age_seconds > 86400
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "A claim has waited more than 24 hours for human review"
+
+      - alert: OpdLargeBacklog
+        expr: opd_claims_by_status{status="PENDING"} > 50
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 50 claims are waiting for review"
+
+      - alert: OpdAutoApprovalSurge
+        expr: sum(increase(opd_approved_amount_inr_total[1h])) > 100000
+        labels: {severity: warning}
+        annotations:
+          summary: "More than ₹1,00,000 auto-approved in one hour"
+
+      - alert: OpdWorkerDbErrors
+        expr: sum(increase(opd_db_errors_total{kind!="duplicate"}[10m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "The worker hit database errors"
+
+      - alert: OpdDuplicateClaimEvents
+        expr: sum(increase(opd_db_errors_total{kind="duplicate"}[30m])) > 3
+        labels: {severity: info}
+        annotations:
+          summary: "Kafka is re-delivering claim events that are already saved"

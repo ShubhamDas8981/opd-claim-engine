@@ -1,0 +1,16 @@
+# Step 1: a separate "room" (namespace) for the project, and a shared disk for uploaded bills.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opd
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: opd-uploads
+  namespace: opd
+spec:
+  accessModes: ["ReadWriteOnce"]     # fine on a one-computer cluster. On AWS use EFS (ReadWriteMany) or S3.
+  resources:
+    requests:
+      storage: 5Gi
