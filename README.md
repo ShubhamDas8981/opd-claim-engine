@@ -7,6 +7,9 @@ confirm what the AI read, and submit the claim. Small, clean bills are approved 
 to a human reviewer. A guardrail layer built on **Guardrails AI** protects every step from prompt injection, fake bills,
 duplicate claims and data leaks.
 
+
+[▶ Watch the OPD Claim Engine Demo](https://www.youtube.com/watch?v=gm7O-nFfTWU)
+
 <!-- Add screenshots to docs/screenshots/ and uncomment:
 ![Chat widget](docs/screenshots/chat.png)
 ![Admin panel](docs/screenshots/admin.png)
